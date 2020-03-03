@@ -214,6 +214,7 @@ set(_temp_acid_headers
 		Scenes/ScenePhysics.hpp
 		Scenes/Scenes.hpp
 		Scenes/SceneStructure.hpp
+		Settings/Settings.hpp
 		Shadows/ShadowBox.hpp
 		Shadows/ShadowRender.hpp
 		Shadows/Shadows.hpp
@@ -467,6 +468,7 @@ set(_temp_acid_sources
 		Scenes/ScenePhysics.cpp
 		Scenes/Scenes.cpp
 		Scenes/SceneStructure.cpp
+		Settings/Settings.cpp
 		Shadows/ShadowBox.cpp
 		Shadows/ShadowRender.cpp
 		Shadows/Shadows.cpp

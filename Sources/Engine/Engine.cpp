@@ -12,6 +12,7 @@
 #include "Graphics/Graphics.hpp"
 #include "Resources/Resources.hpp"
 #include "Scenes/Scenes.hpp"
+#include "Settings/Settings.hpp"
 #include "Shadows/Shadows.hpp"
 #include "Timers/Timers.hpp"
 #include "Uis/Uis.hpp"
@@ -42,6 +43,7 @@ Engine::Engine(std::string argv0, bool emptyRegister) :
 		Files::Register();
 		Timers::Register();
 		Resources::Register();
+		Settings::Register();
 		Window::Register();
 		Audio::Register();
 		Joysticks::Register();
