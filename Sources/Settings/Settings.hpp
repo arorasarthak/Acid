@@ -54,7 +54,7 @@ public:
 	class Setting : public Base {
 	public:
 		explicit Setting(const std::string &name, K value = {}) :
-			Base(name),
+			Base(name, CategoryId),
 			value(std::move(value)) {
 		}
 
@@ -75,12 +75,14 @@ public:
 
 class SettingsSetting {
 public:
-	explicit SettingsSetting(std::string name) :
-		name(std::move(name)) {
+	SettingsSetting(std::string name, std::uint32_t category) :
+		name(std::move(name)),
+		category(category) {
 	}
 	virtual ~SettingsSetting() = default;
 
 	const std::string name;
+	const std::uint32_t category;
 };
 
 template<typename Base>

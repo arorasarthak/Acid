@@ -8,7 +8,7 @@ Settings::Settings() {
 	
 #ifdef DEBUG
 	DoWithSettings([](std::string settingName, SettingsSetting *setting) {
-		Log::Debug("Setting ", settingName, "\n");
+		Log::Debug("Setting ", settingName, " (", setting->category, ")\n");
 	});
 #endif
 }
