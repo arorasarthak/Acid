@@ -217,5 +217,19 @@ public:
 			return static_cast<T>(temp);
 		}
 	}
+
+	/**
+	 * FNV-1a 32bit hashing algorithm. https://gist.github.com/Lee-R/3839813
+	 * @param s The c string pointer.
+	 * @param count Number of characters to hash.
+	 * @return A unique hashed id.
+	 */
+	static constexpr std::uint32_t fnv1a_32(const char *s, std::size_t count) {
+		return ((count ? fnv1a_32(s, count - 1) : 2166136261u) ^ s[count]) * 16777619u;
+	}
 };
+
+constexpr std::uint32_t operator"" _hash(const char *s, std::size_t count) {
+	return String::fnv1a_32(s, count);
+}
 }

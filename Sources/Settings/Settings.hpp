@@ -3,8 +3,10 @@
 #include <utility>
 
 #include "Engine/Engine.hpp"
+#include "Maths/Colour.hpp"
 #include "Maths/Vector2.hpp"
 #include "Utils/Factory.hpp"
+#include "Utils/String.hpp"
 
 namespace acid {
 template<typename T>
@@ -23,18 +25,20 @@ public:
 	
 	MultipleChoice() = default;
 	explicit MultipleChoice(const std::vector<T> &options, std::size_t current = 0) :
-		options(options),
-		current(current) {
+		current(current),
+		options(options) {
 	}
 
 	void Add(T value, const std::string &name, bool enabled = true) {
 		options.emplace_back(value, name, enabled);
 	}
 
+	std::size_t current = 0;
 private:
 	std::vector<Option> options;
-	std::size_t current = 0;
 };
+
+
 
 template<typename Base>
 class SettingFactory {
@@ -46,12 +50,12 @@ public:
 		return impl;
 	}
 
-	template<typename T, typename K>
-	class SettingType : public Base {
+	template<typename T, typename K, std::uint32_t CategoryId>
+	class Setting : public Base {
 	public:
-		explicit SettingType(const std::string &name, const K &value = {}) :
+		explicit Setting(const std::string &name, K value = {}) :
 			Base(name),
-			value(value) {
+			value(std::move(value)) {
 		}
 
 		const K &GetValue() const { return value; }
@@ -69,12 +73,12 @@ public:
 	};
 };
 
-class Setting {
+class SettingsSetting {
 public:
-	explicit Setting(std::string name) :
+	explicit SettingsSetting(std::string name) :
 		name(std::move(name)) {
 	}
-	virtual ~Setting() = default;
+	virtual ~SettingsSetting() = default;
 
 	const std::string name;
 };
@@ -85,76 +89,118 @@ public:
 	virtual ~SettingsTabFactory() = default;
 
 	static auto &Registry() {
-		static std::unordered_map<std::string, std::function<std::unique_ptr<Base>()>> impl;
+		static std::vector<std::function<std::unique_ptr<Base>()>> impl;
 		return impl;
 	}
 
 	template<typename T>
-	class SettingsTabType : public Base {
+	class Tab : public Base {
 	public:
-		explicit SettingsTabType(const std::string &name) :
+		explicit Tab(const std::string &name) :
 			Base(name) {
 		}
 	protected:
-		static bool Register(const std::string &name) {
-			SettingsTabFactory::Registry()[name] = []() -> std::unique_ptr<Base> {
-				return std::make_unique<T>();
-			};
+		static bool Register() {
+			SettingsTabFactory::Registry().emplace_back([]() -> std::unique_ptr<Base> {
+				auto result = std::make_unique<T>();
+				for (const auto &[name, func] : T::Registry()) {
+					result->settings[name] = func();
+				}
+				return std::move(result);
+			});
 			return true;
 		}
 	};
 };
 
-//class SettingCategory : public 
-
-class SettingsTab : public SettingsTabFactory<SettingsTab>, public SettingFactory<Setting> {
+class SettingsTab : public SettingFactory<SettingsSetting> {
+protected:
+	template<typename TabType, std::uint32_t TypeId>
+	class Category {
+	public:
+		template<typename T, typename K>
+		using Setting = typename TabType::template Setting<T, K, TypeId>;
+	};
 public:
+	using Default = Category<SettingsTab, "Default"_hash>;
+	
 	explicit SettingsTab(std::string name) :
 		name(std::move(name)) {
 	}
 	virtual ~SettingsTab() = default;
-
+	
 	const std::string name;
+	std::unordered_map<std::string, std::unique_ptr<SettingsSetting>> settings;
 };
 
-
-
-
-
-
-class GraphicsSettingsTab : public SettingsTab::SettingsTabType<GraphicsSettingsTab> {
-	inline static const bool Registered = Register("graphics");
+/**
+ * @brief Module used for managing engine configurations.
+ */
+class ACID_EXPORT Settings : public Module::Registrar<Settings, Module::Stage::Post>, public SettingsTabFactory<SettingsTab> {
 public:
-	GraphicsSettingsTab() : SettingsTabType("Graphics") {}
+	Settings();
+
+	void Update() override;
+
+	void DoWithSettings(const std::function<void(std::string, SettingsSetting *)> &action) const;
+
+private:
+	std::vector<std::unique_ptr<SettingsTab>> tabs;
+};
+using Color = Colour;
+
+
+
+class DeveloperSettingsTab : public Settings::Tab<DeveloperSettingsTab> {
+	inline static const bool Registered = Register();
+public:
+	DeveloperSettingsTab() : Tab("Developer Options") {}
 };
 
-class WindowSizeSetting : public GraphicsSettingsTab::SettingType<WindowSizeSetting, Vector2i> {
-	inline static const bool Registered = Register("windowSize");
-public:
-	WindowSizeSetting() : SettingType("Window Size", {1080, 720}) {}
+enum class LogLevel {
+	Debug, Warning, Error
 };
-
-class WindowModeSetting : public GraphicsSettingsTab::SettingType<WindowModeSetting, MultipleChoice<int>> {
-	inline static const bool Registered = Register("windowMode");
+class LogLevelSetting : public DeveloperSettingsTab::Default::Setting<LogLevelSetting, MultipleChoice<LogLevel>> {
+	inline static const bool Registered = Register("SETTING_DEVELOPER_LOG_LEVEL");
 public:
-	WindowModeSetting() : SettingType("Window Mode") {
-		value.Add(1, "Windowed");
-		value.Add(2, "Fullscreen Borderless");
-		value.Add(4, "Fullscreen Exclusive");
+	LogLevelSetting() : Setting("Log Level") {
+		value.Add(LogLevel::Debug, "Debug");
+		value.Add(LogLevel::Warning, "Warning");
+		value.Add(LogLevel::Error, "Error");
 	}
 };
 
 
 
-
-
-/**
- * @brief Module used for managing engine configurations.
- */
-class ACID_EXPORT Settings : public Module::Registrar<Settings, Module::Stage::Post> {
+class ColorSettingsTab : public Settings::Tab<ColorSettingsTab> {
+	inline static const bool Registered = Register();
 public:
-	Settings();
+	using Background = Category<ColorSettingsTab, "Background"_hash>;
+	using Waveform = Category<ColorSettingsTab, "Waveform"_hash>;
+	ColorSettingsTab() : Tab("Colors") {}
+};
 
-	void Update() override;
+class BackgroundColorDarkSetting : public ColorSettingsTab::Background::Setting<BackgroundColorDarkSetting, Color> {
+	inline static const bool Registered = Register("SETTING_BACKGROUND_COLOR_DARK");
+public:
+	BackgroundColorDarkSetting() : Setting("High Contrast", 0xFF1c1c1c) {}
+};
+
+class BackgroundColorLightSetting : public ColorSettingsTab::Background::Setting<BackgroundColorLightSetting, Color> {
+	inline static const bool Registered = Register("SETTING_BACKGROUND_COLOR_LIGHT");
+public:
+	BackgroundColorLightSetting() : Setting("Normal", 0xFFFFFFFF) {}
+};
+
+class WaveformColorDarkSetting : public ColorSettingsTab::Waveform::Setting<WaveformColorDarkSetting, Color> {
+	inline static const bool Registered = Register("SETTING_ECG_COLOR_DARK");
+public:
+	WaveformColorDarkSetting() : Setting("High Contrast", 0xFFFD9F2B) {}
+};
+
+class WaveformColorLightSetting : public ColorSettingsTab::Waveform::Setting<WaveformColorLightSetting, Color> {
+	inline static const bool Registered = Register("SETTING_ECG_COLOR_LIGHT");
+public:
+	WaveformColorLightSetting() : Setting("Normal", 0xFF000000) {}
 };
 }
